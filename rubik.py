@@ -1,6 +1,37 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
+"""Rubik Cube 2x2 Solver. 
 
+Input format:
+  Colors: 
+    red = r
+    white = w
+    blue = b
+    yellow = y
+    purple = p
+    green = g
+
+Arguments:
+    side ordering:
+      TopFrontBottomBackLeftRight
+    order of surfaces on one side:
+      1. 2.
+      3. 4.
+    
+    e.g. rgrggpyybbppwwbrwwgpyyrb
+
+Available Commands in the Terminal:
+  exit    exit the program
+  print   print the current cube
+  solve   try to find a solution for the current cube
+  random  randomize the current cube
+  l/L     move left down / left up
+  f/F     move front clockwise / front anticlockwise
+  t/T     move top left / top right
+  
+  The move-commands can be chained: e.g. lFtL
+  
+"""
 import sys
 import random
 
@@ -121,6 +152,7 @@ def readCube():
                 for pos in [0, 1]:
                     inputCube[side][row][pos] = eval(inputText[counter])
                     counter += 1
+        
     return inputCube
 
 def defaultCube():

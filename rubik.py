@@ -35,7 +35,10 @@ Available Commands in the Terminal:
 import sys
 import random
 
-import readline
+try:
+	import readline
+except ImportError:
+	pass
 
 # backward compatibility for python 2 and python 3
 try:
@@ -202,37 +205,57 @@ def main():
             print "Command not known. Possible commands are: solve, print, l, t, f, L, T, F, exit"
 
 def solve(inputCube):
-    iteration = -1
+    if checkSolved(inputCube):
+        print ""
+        print "The Cube is already solved. Nothing to do." 
+        print ""
+        return
+    
+    iteration = 0
     cubeKeys = set([get_key(inputCube)])
     solution_found = False
-    newcubes = [(inputCube, "")] 
-    while iteration < 9 and not solution_found:
+    newcubes = [(inputCube, "")]
+    cubeCount = 1  
+    while not solution_found:
         iteration += 1
-        print "Cube count: %d, Iteration: %d" % (len(cubeKeys), iteration)
+        print "Cube count: %d, Iteration: %d" % (cubeCount, iteration)
         cubes = newcubes
         newcubes = []
         for currCube, path in cubes:
-            if checkSolved(currCube):
-                print ""
-                print "Found Solution: " + path
-                print ""
-                solution_found = True
-                break
-                
-            moves = []
-            if (len(path) == 0 or path[-1] != "L") and (len(path) < 3 or path[-3:] != "lll"): moves.append((leftDown(copyCube(currCube)), "l"))
-            if (len(path) == 0 or path[-1] != "T") and (len(path) < 3 or path[-3:] != "ttt"): moves.append((topLeft(copyCube(currCube)), "t"))
-            if (len(path) == 0 or path[-1] != "F") and (len(path) < 3 or path[-3:] != "fff"): moves.append((frontClockwise(copyCube(currCube)), "f"))
-            if (len(path) == 0 or path[-1] != "l") and (len(path) < 3 or path[-3:] != "LLL"): moves.append((leftUp(copyCube(currCube)), "L"))
-            if (len(path) == 0 or path[-1] != "t") and (len(path) < 3 or path[-3:] != "TTT"): moves.append((topRight(copyCube(currCube)), "T"))
-            if (len(path) == 0 or path[-1] != "f") and (len(path) < 3 or path[-3:] != "FFF"): moves.append((frontAntiClockwise(copyCube(currCube)), "F"))
-                
+
+            # optimization if iteration count gets bigger than 8
+            loopCount = 1 if iteration < 8 else iteration - 7 
+            
+            moves = [(currCube, path)]
+            for _ in range(loopCount):
+                newmoves = [] 
+                for currCube, path in moves:
+                    if (len(path) == 0 or path[-1] != "L") and (len(path) < 3 or path[-3:] != "lll"): newmoves.append((leftDown(copyCube(currCube)), path + "l"))
+                    if (len(path) == 0 or path[-1] != "T") and (len(path) < 3 or path[-3:] != "ttt"): newmoves.append((topLeft(copyCube(currCube)), path + "t"))
+                    if (len(path) == 0 or path[-1] != "F") and (len(path) < 3 or path[-3:] != "fff"): newmoves.append((frontClockwise(copyCube(currCube)), path + "f"))
+                    if (len(path) == 0 or path[-1] != "l") and (len(path) < 3 or path[-3:] != "LLL"): newmoves.append((leftUp(copyCube(currCube)), path + "L"))
+                    if (len(path) == 0 or path[-1] != "t") and (len(path) < 3 or path[-3:] != "TTT"): newmoves.append((topRight(copyCube(currCube)), path + "T"))
+                    if (len(path) == 0 or path[-1] != "f") and (len(path) < 3 or path[-3:] != "FFF"): newmoves.append((frontAntiClockwise(copyCube(currCube)), path + "F"))
+                moves = newmoves
+            cubeCount += len(moves)
             for (nextCube, operation) in moves:
-                key = get_key(nextCube)
-                if key not in cubeKeys:
-                    cubeKeys.add(key)
-                    newcubes.append((nextCube, path + operation))
-    
+                if checkSolved(nextCube):
+                    print ""
+                    print "Found Solution: " + operation
+                    print ""
+                    solution_found = True
+                    break
+                
+                if iteration <= 8:
+                    key = get_key(nextCube)
+                    if key not in cubeKeys:
+                        cubeKeys.add(key)                                        
+                        newcubes.append((nextCube, operation))
+            if solution_found:
+                break
+            if iteration > 8:
+                newcubes = cubes
+                    
     if not solution_found:
         print "No solution found in %d iterations." % iteration
 

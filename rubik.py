@@ -4,12 +4,12 @@
 
 Input format:
   Colors: 
-    red = R
-    white = W
-    blue = B
-    yellow = Y
-    purple = P
-    green = G
+    red = r
+    white = w
+    blue = b
+    yellow = y
+    purple = p
+    green = g
 
 Arguments:
     side ordering:
@@ -33,8 +33,9 @@ Available Commands in the Terminal:
   
   http://www.mathematische-basteleien.de/miniwuerfel.htm
   
-  Very complicated situation:
-  lfllffTFttlt  
+  Very complex situations:
+  lfllffTFttlt
+  lftfLfLfftLT
 """
 import sys
 import random
@@ -108,30 +109,21 @@ def calculateDefaultCubesOriented(cubes):
     cubes[get_key(ctbtbtb)] = (ctbtbtb, "")
 
     for cube in [c, ctb, ctbtb, ctbtbtb]:
-        clr = rightDown(leftDown(copyCube(cube)))
-        clrlr = rightDown(leftDown(copyCube(clr)))
-        clrlrlr = rightDown(leftDown(copyCube(clrlr)))
-        
-        cubes[get_key(clr)] = (clr, "")
-        cubes[get_key(clrlr)] = (clrlr, "")
-        cubes[get_key(clrlrlr)] = (clrlrlr, "")
-    
-        cfa = frontClockwise(backClockwise(copyCube(cube)))
-        cfafa = frontClockwise(backClockwise(copyCube(cfa)))
-        cfafafa = frontClockwise(backClockwise(copyCube(cfafa)))
-        
-        cubes[get_key(cfa)] = (cfa, "")
-        cubes[get_key(cfafa)] = (cfafa, "")
-        cubes[get_key(cfafafa)] = (cfafafa, "")
+        for method1, method2 in [(rightDown, leftDown), (frontClockwise, backClockwise)]:
+            nextCube = cube
+            for _ in range(3):
+                nextCube = method1(method2(copyCube(nextCube)))
+                cubes[get_key(nextCube)] = (nextCube, "")
+
 
 def checkSolved(testCube):
     key = get_key(testCube)
     if key in preSolutionCubes:
         path = preSolutionCubes[key][1]
         return (True, path.swapcase()[::-1])
-            
-    return (False, "")
-    
+    else:
+        return (False, "")
+
 def getAllMoves(currCube, path):
     if (len(path) == 0 or path[-1] != "L") and (len(path) < 3 or path[-3:] != "lll"):
         yield (leftDown(copyCube(currCube)), path + "l")
@@ -282,44 +274,34 @@ def solve(inputCube):
     solved, solvePath = checkSolved(inputCube) 
     if solved:
         if solvePath == "":
-            print ""
-            print "The Cube is already solved. Nothing to do." 
-            print ""
+            print "\nThe Cube is already solved. Nothing to do.\n" 
         else:
-            print ""
-            print "Found Solution: " + solvePath
-            print ""
-        return
-    
-    iteration = 0
-    cubeKeys = set([get_key(inputCube)])
-    newcubes = [(inputCube, "")]
-    cubeCount = 1
-    try:
-        while True: # will return the function when a solution was found.
-            iteration += 1
-            cubes = newcubes
-            newcubes = []
-            for currCube, path in cubes:
-                for nextCube, operation in getAllMoves(currCube, path):
-                    cubeCount += 1
-                    key = get_key(nextCube)
-                    if key not in cubeKeys:
-                        solved, solvePath = checkSolved(nextCube)
-                        if solved:
-                            print "\nFound Solution: %s%s\n" % (operation, solvePath)
-                            return
-                        
-                        cubeKeys.add(key)                                        
-                        newcubes.append((nextCube, operation))
-    except KeyboardInterrupt:
-        pass
+            print "\nFound Solution: %s\n" % solvePath
+    else:
+        cubeKeys = set([get_key(inputCube)])
+        newcubes = [(inputCube, "")]
+        try:
+            while True:
+                cubes, newcubes = newcubes, []
+                for currCube, path in cubes:
+                    for nextCube, operation in getAllMoves(currCube, path):
+                        key = get_key(nextCube)
+                        if key not in cubeKeys:
+                            solved, solvePath = checkSolved(nextCube)
+                            if solved:
+                                print "\nFound Solution: %s%s\n" % (operation, solvePath)
+                                return
+                            
+                            cubeKeys.add(key)                                        
+                            newcubes.append((nextCube, operation))
+        except KeyboardInterrupt:
+            pass
     
 def random_moves(cube, count):
     cubeKeys = set([get_key(cube)])
     randomMoves = 0
-    moves = [leftDown, leftUp, rightDown, rightUp, 
-             topLeft, topRight, bottomLeft, bottomRight, 
+    moves = [leftDown, leftUp, rightDown, rightUp,
+             topLeft, topRight, bottomLeft, bottomRight,
              frontClockwise, frontAntiClockwise, backClockwise, backAntiClockwise]
     while randomMoves < count:
         move = random.choice(moves)

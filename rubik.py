@@ -12,19 +12,24 @@ Input format:
     green = g
 
 Arguments:
-    side ordering:
-      TopFrontBottomBackLeftRight
-    order of surfaces on one side:
-      1. 2.
-      3. 4.
+      <Top><Front><Bottom><Back><Left><Right>
+      tttt ffff   bbbb    aaaa  llll  rrrr
+      e.G. rubik.py rgrggpyybbppwwbrwwgpyyrb
+      or:  rubik.py rrwrbwwwpppyygyybrbbgggp  (cube in a cube -- very complex to solve)
     
-    e.G. rgrggpyybbppwwbrwwgpyyrb
+    Order of surfaces on one side:
+      -------
+      |1. 2.|
+      |3. 4.|
+      -------
 
 Available Commands in the Terminal:
   exit    exit the program
   print   print the current cube
   solve   try to find a solution for the current cube
-  random  randomize the current cube
+  init    re-init the cube with a new side sequence
+  random  randomize the current cube with 8 moves
+  random4 randomize the current cube with 4 moves
   l/L     move LEFT down / LEFT up
   f/F     move FRONT clockwise / FRONT anticlockwise
   t/T     move TOP LEFT / TOP RIGHT
@@ -32,10 +37,14 @@ Available Commands in the Terminal:
   The move-commands can be chained: e.G. lFtL
   
   http://www.mathematische-basteleien.de/miniwuerfel.htm
+  http://www.jaapsch.net/puzzles/javascript/cube2j.htm  
   
-  Very complex situations:
+  
+  Very complex moves:
+  ttlfTlFlFTLL cube in a cube
   lfllffTFttlt
   lftfLfLfftLT
+  lltfLfLtFLTT
 """
 import sys
 import random
@@ -258,16 +267,14 @@ def backAntiClockwise(cube):
     backClockwise(cube)
     return cube
 
-def readCube():
+def readCube(inputText):
     inputCube = defaultCube()
-    if sys.argv[1:]:
-        charPosition = 0
-        inputText = sys.argv[1]
-        for side in (TOP, FRONT, BOTTOM, BACK, LEFT, RIGHT):
-            for row in [0, 1]:
-                for pos in [0, 1]:
-                    inputCube[side][row][pos] = eval(inputText[charPosition].upper())
-                    charPosition += 1
+    charPosition = 0
+    for side in (TOP, FRONT, BOTTOM, BACK, LEFT, RIGHT):
+        for row in [0, 1]:
+            for pos in [0, 1]:
+                inputCube[side][row][pos] = eval(inputText[charPosition].upper())
+                charPosition += 1
     return inputCube
 
 def solve(inputCube):
@@ -332,7 +339,10 @@ def main():
                 if key not in preSolutionCubes:
                     preSolutionCubes[key] = (nextCube, nextPath)
 
-    cube = readCube()
+    if sys.argv[1:]:
+        cube = readCube(sys.argv[1])
+    else:
+        cube = readCube("yyyyrrrrwwwwppppbbbbgggg")
     printcube(cube)
     while True:
         cmdText = input("Please enter command: ")
@@ -348,6 +358,9 @@ def main():
             printcube(cube)
         elif cmdText == "reset":
             cube = defaultCube()
+            printcube(cube)
+        elif cmdText[:5] == "init ":
+            cube = readCube(cmdText[5:])
             printcube(cube)
         elif cmdText == "exit":
             exit(0)

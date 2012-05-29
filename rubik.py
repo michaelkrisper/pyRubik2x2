@@ -45,6 +45,12 @@ Available Commands in the Terminal:
   lfllffTFttlt
   lftfLfLfftLT
   lltfLfLtFLTT
+  
+  TODO:
+  * Use a thread for pre-calculatino
+  * Use Threads during solve
+  * document (doc-strings)
+  * correct naming (make more intuitive)  
 """
 import sys
 import random
@@ -53,13 +59,6 @@ try:
     import readline
 except ImportError:
     pass
-
-# backward compatibility for python 2 and python 3
-try:
-    input = raw_input
-except NameError:
-    pass
-
 
 LEVEL_OF_PRECALCULATION = 4
 
@@ -278,6 +277,7 @@ def readCube(inputText):
     return inputCube
 
 def solve(inputCube):
+    # todo wait for init thread to finish
     solved, solvePath = checkSolved(inputCube) 
     if solved:
         if solvePath == "":
@@ -287,9 +287,13 @@ def solve(inputCube):
     else:
         cubeKeys = set([get_key(inputCube)])
         newcubes = [(inputCube, "")]
+        solution_found = False
         try:
-            while True:
+            while not solution_found:
                 cubes, newcubes = newcubes, []
+                # todo calculate in threads e.g. one thread for each cube, or 4 worker threads!
+                # example: put the cubes in a queue and run 4 worker threads which empty the queue
+                # introduce a global variable: solution_found to stop the worker threads.
                 for currCube, path in cubes:
                     for nextCube, operation in getAllMoves(currCube, path):
                         key = get_key(nextCube)
@@ -297,9 +301,11 @@ def solve(inputCube):
                             solved, solvePath = checkSolved(nextCube)
                             if solved:
                                 print "\nFound Solution: %s%s\n" % (operation, solvePath)
+                                # todo: stop all thread if solution was found.
+                                solution_found = True
                                 return
                             
-                            cubeKeys.add(key)                                        
+                            cubeKeys.add(key)
                             newcubes.append((nextCube, operation))
         except KeyboardInterrupt:
             pass
@@ -325,7 +331,8 @@ def get_key(cube):
 
 def main():
     print "-- Rubik 2x2 Solver --"
-    
+
+    # todo: do this in a thread!!    
     calculateDefaultCubesOriented(preSolutionCubes)
     # DefaultCubes: 24 Cubes
     # Level 1: 168 Cubes
@@ -338,6 +345,7 @@ def main():
                 key = get_key(nextCube)
                 if key not in preSolutionCubes:
                     preSolutionCubes[key] = (nextCube, nextPath)
+    # todo until here --- do this in a thread
 
     if sys.argv[1:]:
         cube = readCube(sys.argv[1])
@@ -345,7 +353,7 @@ def main():
         cube = readCube("yyyyrrrrwwwwppppbbbbgggg")
     printcube(cube)
     while True:
-        cmdText = input("Please enter command: ")
+        cmdText = raw_input("Please enter command: ")
         if cmdText == "solve":
             solve(cube)
         elif cmdText == "print":

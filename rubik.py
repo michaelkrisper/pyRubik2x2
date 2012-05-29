@@ -47,9 +47,10 @@ Available Commands in the Terminal:
   lltfLfLtFLTT
   
   TODO:
-  * Use Threads during solve
+  * Move everything into a class for better reuse
   * document (doc-strings)
-  * correct naming (make more intuitive)  
+  * correct naming (make more intuitive)
+  * Use Threads during solve
 """
 import sys
 import random
@@ -60,6 +61,7 @@ try:
 except ImportError:
     pass
 
+# CONSTANTS ###################################################################
 LEVEL_OF_PRECALCULATION = 4
 
 R = "\x1b[1;31;41m R \x1b[0m"
@@ -75,6 +77,12 @@ BOTTOM = 2
 BACK = 3
 LEFT = 4
 RIGHT = 5
+# CONSTANTS ###################################################################
+
+
+# GLOBALS #####################################################################
+preSolutionCubes = {}
+# GLOBALS #####################################################################
 
 def defaultCube(): 
     return [[[Y, Y], [Y, Y]],
@@ -83,8 +91,6 @@ def defaultCube():
             [[P, P], [P, P]],
             [[B, B], [B, B]],
             [[G, G], [G, G]]]
-
-preSolutionCubes = {}
 
 def copyCube(cube):
     return [[row[:] for row in side] for side in cube]

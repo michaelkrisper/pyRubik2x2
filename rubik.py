@@ -47,13 +47,13 @@ Available Commands in the Terminal:
   lltfLfLtFLTT
   
   TODO:
-  * Use a thread for pre-calculatino
   * Use Threads during solve
   * document (doc-strings)
   * correct naming (make more intuitive)  
 """
 import sys
 import random
+import threading
 
 try:
     import readline
@@ -277,7 +277,6 @@ def readCube(inputText):
     return inputCube
 
 def solve(inputCube):
-    # todo wait for init thread to finish
     solved, solvePath = checkSolved(inputCube) 
     if solved:
         if solvePath == "":
@@ -329,23 +328,25 @@ def random_moves(cube, count):
 def get_key(cube):
     return "".join([pos for side in cube for row in side for pos in row])
 
-def main():
-    print "-- Rubik 2x2 Solver --"
-
-    # todo: do this in a thread!!    
-    calculateDefaultCubesOriented(preSolutionCubes)
+def preCalcCubes():
     # DefaultCubes: 24 Cubes
     # Level 1: 168 Cubes
     # Level 2: 816 Cubes
     # level 3: 3696 Cubes
-    # Level 4: 16512 Cubes
-    for precalculation_level in range(LEVEL_OF_PRECALCULATION):
+    # Level 4: 16512 Cubes    
+    calculateDefaultCubesOriented(preSolutionCubes)
+    for _ in range(LEVEL_OF_PRECALCULATION):
         for key, (cube, path) in preSolutionCubes.items()[:]:
             for nextCube, nextPath in getAllMoves(cube, path):
                 key = get_key(nextCube)
                 if key not in preSolutionCubes:
                     preSolutionCubes[key] = (nextCube, nextPath)
-    # todo until here --- do this in a thread
+
+def main():
+    t = threading.Thread(target=preCalcCubes)
+    t.start()
+    
+    print "-- Rubik 2x2 Solver --"
 
     if sys.argv[1:]:
         cube = readCube(sys.argv[1])
@@ -355,6 +356,7 @@ def main():
     while True:
         cmdText = raw_input("Please enter command: ")
         if cmdText == "solve":
+            t.join()
             solve(cube)
         elif cmdText == "print":
             printcube(cube)

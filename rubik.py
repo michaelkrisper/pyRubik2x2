@@ -1,60 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
-"""Rubik Cube 2x2 Solver. 
+"""
+This script provides a solver for the 2x2 Rubik's Cube (Pocket Cube).
 
-Input format:
-  Colors: 
-    red = r
-    white = w
-    blue = b
-    yellow = y
-    purple = p
-    green = g
+It can be run interactively to allow manual manipulation of the cube,
+randomization, and solving. It can also solve a cube state provided as a
+command-line argument.
 
-Arguments:
-      <Top><Front><Bottom><Back><Left><Right>
-      tttt ffff   bbbb    aaaa  llll  rrrr
-      e.G. rubik.py rgrggpyybbppwwbrwwgpyyrb
-      or:  rubik.py rrwrbwwwpppyygyybrbbgggp  (cube in a cube -- very complex to solve)
-    
-    Order of surfaces on one side:
-      -------
-      |1. 2.|
-      |3. 4.|
-      -------
-
-Available Commands in the Terminal:
-  exit    exit the program
-  print   print the current cube
-  solve   try to find a solution for the current cube
-  init    re-init the cube with a new side sequence
-  random  randomize the current cube with 8 moves
-  random4 randomize the current cube with 4 moves
-  l/L     move LEFT down / LEFT up
-  f/F     move FRONT clockwise / FRONT anticlockwise
-  t/T     move TOP LEFT / TOP RIGHT
-  
-  The move-commands can be chained: e.G. lFtL
-  
-  http://www.mathematische-basteleien.de/miniwuerfel.htm
-  http://www.jaapsch.net/puzzles/javascript/cube2j.htm  
-  
-  
-  Very complex moves:
-  ttlfTlFlFTLL cube in a cube
-  lfllffTFttlt
-  lftfLfLfftLT
-  lltfLfLtFLTT
-  
-  TODO:
-  * Move everything into a class for better reuse
-  * document (doc-strings)
-  * correct naming (make more intuitive)
-  * Use Threads during solve
+The solver uses a breadth-first search algorithm and a pre-calculation step
+to find solutions for cubes that are a few moves away from the solved state.
 """
 import sys
 import random
 import threading
+from cube import RubikCube
 
 try:
     import readline
@@ -63,20 +22,6 @@ except ImportError:
 
 # CONSTANTS ###################################################################
 LEVEL_OF_PRECALCULATION = 4
-
-R = "\x1b[1;31;41m R \x1b[0m"
-W = "\x1b[1;37;47m W \x1b[0m"
-B = "\x1b[1;34;44m B \x1b[0m"
-Y = "\x1b[1;33;43m Y \x1b[0m"
-P = "\x1b[1;35;45m P \x1b[0m"
-G = "\x1b[1;32;42m G \x1b[0m"
-
-TOP = 0
-FRONT = 1
-BOTTOM = 2
-BACK = 3
-LEFT = 4
-RIGHT = 5
 # CONSTANTS ###################################################################
 
 
@@ -84,54 +29,61 @@ RIGHT = 5
 preSolutionCubes = {}
 # GLOBALS #####################################################################
 
-def defaultCube(): 
-    return [[[Y, Y], [Y, Y]],
-            [[R, R], [R, R]],
-            [[W, W], [W, W]],
-            [[P, P], [P, P]],
-            [[B, B], [B, B]],
-            [[G, G], [G, G]]]
 
-def copyCube(cube):
-    return [[row[:] for row in side] for side in cube]
-
-def printcube(cube):
-    print "        ╔═══╤═══╗"
-    print "        ║%s│%s║" % (cube[TOP][0][0], cube[TOP][0][1])
-    print "        ╟───┼───╢"
-    print "        ║%s│%s║" % (cube[TOP][1][0], cube[TOP][1][1])
-    print "╔═══╤═══╬═══╪═══╬═══╤═══╦═══╤═══╗"
-    print "║%s│%s║%s│%s║%s│%s║%s│%s║" % (cube[LEFT][0][0], cube[LEFT][0][1], cube[FRONT][0][0], cube[FRONT][0][1], cube[RIGHT][0][0], cube[RIGHT][0][1], cube[BACK][1][1], cube[BACK][1][0])
-    print "╫───┼───╫───┼───╫───┼───╫───┼───╢"
-    print "║%s│%s║%s│%s║%s│%s║%s│%s║" % (cube[LEFT][1][0], cube[LEFT][1][1], cube[FRONT][1][0], cube[FRONT][1][1], cube[RIGHT][1][0], cube[RIGHT][1][1], cube[BACK][0][1], cube[BACK][0][0])
-    print "╚═══╧═══╬═══╪═══╬═══╧═══╩═══╧═══╝"
-    print "        ║%s│%s║" % (cube[BOTTOM][0][0], cube[BOTTOM][0][1])
-    print "        ╟───┼───╢"
-    print "        ║%s│%s║" % (cube[BOTTOM][1][0], cube[BOTTOM][1][1])
-    print "        ╚═══╧═══╝"
-    
-    
 def calculateDefaultCubesOriented(cubes):
-    c = defaultCube()
-    ctb = topLeft(bottomLeft(copyCube(c)))
-    ctbtb = topLeft(bottomLeft(copyCube(ctb)))
-    ctbtbtb = topLeft(bottomLeft(copyCube(ctbtb)))
-    
-    cubes[get_key(c)] = (c, "")
-    cubes[get_key(ctb)] = (ctb, "")
-    cubes[get_key(ctbtb)] = (ctbtb, "")
-    cubes[get_key(ctbtbtb)] = (ctbtbtb, "")
+    """
+    Generates the 24 possible orientations of a solved cube.
 
-    for cube in [c, ctb, ctbtb, ctbtbtb]:
-        for method1, method2 in [(rightDown, leftDown), (frontClockwise, backClockwise)]:
-            nextCube = cube
+    This function populates the `cubes` dictionary with all 24 orientations
+    of a solved cube, which are used as the base states for pre-calculation.
+
+    Args:
+        cubes (dict): A dictionary to store the pre-calculated cube states.
+    """
+    c = RubikCube()
+    c_copy = RubikCube(c.get_key())
+    c_copy.move_top_left()
+    c_copy.move_bottom_left()
+    ctb = c_copy
+
+    c_copy = RubikCube(ctb.get_key())
+    c_copy.move_top_left()
+    c_copy.move_bottom_left()
+    ctbtb = c_copy
+
+    c_copy = RubikCube(ctbtbtb.get_key())
+    c_copy.move_top_left()
+    c_copy.move_bottom_left()
+    ctbtbtb = c_copy
+
+    cubes[c.get_key()] = (c, "")
+    cubes[ctb.get_key()] = (ctb, "")
+    cubes[ctbtb.get_key()] = (ctbtb, "")
+    cubes[ctbtbtb.get_key()] = (ctbtbtb, "")
+
+    for cube_obj in [c, ctb, ctbtb, ctbtbtb]:
+        for method1, method2 in [("move_right_down", "move_left_down"), ("move_front_clockwise", "move_back_clockwise")]:
+            nextCube = cube_obj
             for _ in range(3):
-                nextCube = method1(method2(copyCube(nextCube)))
-                cubes[get_key(nextCube)] = (nextCube, "")
+                c_copy = RubikCube(nextCube.get_key())
+                getattr(c_copy, method1)()
+                getattr(c_copy, method2)()
+                nextCube = c_copy
+                cubes[nextCube.get_key()] = (nextCube, "")
 
 
 def checkSolved(testCube):
-    key = get_key(testCube)
+    """
+    Checks if a cube is solved by looking it up in the pre-calculated table.
+
+    Args:
+        testCube (RubikCube): The cube to check.
+
+    Returns:
+        tuple: A tuple containing a boolean indicating if the cube is solved
+               and the path to solve it if it is.
+    """
+    key = testCube.get_key()
     if key in preSolutionCubes:
         path = preSolutionCubes[key][1]
         return (True, path.swapcase()[::-1])
@@ -139,277 +91,198 @@ def checkSolved(testCube):
         return (False, "")
 
 def getAllMoves(currCube, path):
+    """
+    Generates all possible next moves for a given cube.
+
+    This function yields a new cube state and the corresponding move for each
+    of the 6 possible moves from the current state.
+
+    Args:
+        currCube (RubikCube): The current state of the cube.
+        path (str): The sequence of moves taken to reach the current state.
+
+    Yields:
+        tuple: A tuple containing the new cube state and the updated path.
+    """
     if (len(path) == 0 or path[-1] != "L") and (len(path) < 3 or path[-3:] != "lll"):
-        yield (leftDown(copyCube(currCube)), path + "l")
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_left_down()
+        yield (new_cube, path + "l")
     if (len(path) == 0 or path[-1] != "T") and (len(path) < 3 or path[-3:] != "ttt"):
-        yield (topLeft(copyCube(currCube)), path + "t")
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_top_left()
+        yield (new_cube, path + "t")
     if (len(path) == 0 or path[-1] != "F") and (len(path) < 3 or path[-3:] != "fff"):
-        yield (frontClockwise(copyCube(currCube)), path + "f")
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_front_clockwise()
+        yield (new_cube, path + "f")
     if (len(path) == 0 or path[-1] != "l") and (len(path) < 3 or path[-3:] != "LLL"):
-        yield (leftUp(copyCube(currCube)), path + "L")
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_left_up()
+        yield (new_cube, path + "L")
     if (len(path) == 0 or path[-1] != "t") and (len(path) < 3 or path[-3:] != "TTT"):
-        yield (topRight(copyCube(currCube)), path + "T")
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_top_right()
+        yield (new_cube, path + "T")
     if (len(path) == 0 or path[-1] != "f") and (len(path) < 3 or path[-3:] != "FFF"):
-        yield (frontAntiClockwise(copyCube(currCube)), path + "F")
-    
-def leftDown(cube):
-    (cube[TOP][0][0], cube[TOP][1][0],
-    cube[FRONT][0][0], cube[FRONT][1][0],
-    cube[BOTTOM][0][0], cube[BOTTOM][1][0],
-    cube[BACK][0][0], cube[BACK][1][0],
-    cube[LEFT][0][0], cube[LEFT][0][1],
-    cube[LEFT][1][0], cube[LEFT][1][1]) = (cube[BACK][0][0], cube[BACK][1][0],
-                                           cube[TOP][0][0], cube[TOP][1][0],
-                                           cube[FRONT][0][0], cube[FRONT][1][0],
-                                           cube[BOTTOM][0][0], cube[BOTTOM][1][0],
-                                           cube[LEFT][1][0], cube[LEFT][0][0],
-                                           cube[LEFT][1][1], cube[LEFT][0][1])
-    return cube
+        new_cube = RubikCube(currCube.get_key())
+        new_cube.move_front_anti_clockwise()
+        yield (new_cube, path + "F")
 
-def rightDown(cube):
-    (cube[TOP][0][1], cube[TOP][1][1],
-    cube[FRONT][0][1], cube[FRONT][1][1],
-    cube[BOTTOM][0][1], cube[BOTTOM][1][1],
-    cube[BACK][0][1], cube[BACK][1][1],
-    cube[RIGHT][0][0], cube[RIGHT][0][1],
-    cube[RIGHT][1][0], cube[RIGHT][1][1]) = (cube[BACK][0][1], cube[BACK][1][1],
-                                           cube[TOP][0][1], cube[TOP][1][1],
-                                           cube[FRONT][0][1], cube[FRONT][1][1],
-                                           cube[BOTTOM][0][1], cube[BOTTOM][1][1],
-                                           cube[RIGHT][0][1], cube[RIGHT][1][1],
-                                           cube[RIGHT][0][0], cube[RIGHT][1][0])
-    return cube
-
-def rightUp(cube):
-    rightDown(cube)
-    rightDown(cube)
-    rightDown(cube)
-    return cube
-
-def leftUp(cube):
-    leftDown(cube)
-    leftDown(cube)
-    leftDown(cube)
-    return cube
-
-def topLeft(cube):
-    (cube[FRONT][0][0], cube[FRONT][0][1],
-    cube[LEFT][0][0], cube[LEFT][0][1],
-    cube[BACK][1][0], cube[BACK][1][1],
-    cube[RIGHT][0][0], cube[RIGHT][0][1],
-    cube[TOP][0][0], cube[TOP][0][1],
-    cube[TOP][1][0], cube[TOP][1][1]) = (cube[RIGHT][0][0], cube[RIGHT][0][1],
-                                         cube[FRONT][0][0], cube[FRONT][0][1],
-                                         cube[LEFT][0][1], cube[LEFT][0][0],
-                                         cube[BACK][1][1], cube[BACK][1][0],
-                                         cube[TOP][1][0], cube[TOP][0][0],
-                                         cube[TOP][1][1], cube[TOP][0][1])
-    return cube
-
-def topRight(cube):
-    topLeft(cube)
-    topLeft(cube)
-    topLeft(cube)
-    return cube
-
-def bottomLeft(cube):
-    (cube[FRONT][1][0], cube[FRONT][1][1],
-    cube[LEFT][1][0], cube[LEFT][1][1],
-    cube[BACK][0][0], cube[BACK][0][1],
-    cube[RIGHT][1][0], cube[RIGHT][1][1],
-    cube[BOTTOM][0][0], cube[BOTTOM][0][1],
-    cube[BOTTOM][1][0], cube[BOTTOM][1][1]) = (cube[RIGHT][1][0], cube[RIGHT][1][1],
-                                         cube[FRONT][1][0], cube[FRONT][1][1],
-                                         cube[LEFT][1][1], cube[LEFT][1][0],
-                                         cube[BACK][0][1], cube[BACK][0][0],
-                                         cube[BOTTOM][0][1], cube[BOTTOM][1][1],
-                                         cube[BOTTOM][0][0], cube[BOTTOM][1][0])
-    return cube
-
-def bottomRight(cube):
-    bottomLeft(cube)
-    bottomLeft(cube)
-    bottomLeft(cube)
-    return cube
-
-def frontClockwise(cube):
-    (cube[TOP][1][0], cube[TOP][1][1],
-    cube[LEFT][0][1], cube[LEFT][1][1],
-    cube[BOTTOM][0][0], cube[BOTTOM][0][1],
-    cube[RIGHT][0][0], cube[RIGHT][1][0],
-    cube[FRONT][0][0], cube[FRONT][0][1],
-    cube[FRONT][1][0], cube[FRONT][1][1]) = (cube[LEFT][1][1], cube[LEFT][0][1],
-                                            cube[BOTTOM][0][0], cube[BOTTOM][0][1],
-                                            cube[RIGHT][1][0], cube[RIGHT][0][0],
-                                            cube[TOP][1][0], cube[TOP][1][1],
-                                            cube[FRONT][1][0], cube[FRONT][0][0],
-                                            cube[FRONT][1][1], cube[FRONT][0][1])
-    return cube
-
-def frontAntiClockwise(cube):
-    frontClockwise(cube)
-    frontClockwise(cube)
-    frontClockwise(cube)
-    return cube
-
-def backClockwise(cube):
-    (cube[TOP][0][0], cube[TOP][0][1],
-    cube[LEFT][0][0], cube[LEFT][1][0],
-    cube[BOTTOM][1][0], cube[BOTTOM][1][1],
-    cube[RIGHT][0][1], cube[RIGHT][1][1],
-    cube[BACK][0][0], cube[BACK][0][1],
-    cube[BACK][1][0], cube[BACK][1][1]) = (cube[LEFT][1][0], cube[LEFT][0][0],
-                                            cube[BOTTOM][1][0], cube[BOTTOM][1][1],
-                                            cube[RIGHT][1][1], cube[RIGHT][0][1],
-                                            cube[TOP][0][0], cube[TOP][0][1],
-                                            cube[BACK][0][1], cube[BACK][1][1],
-                                            cube[BACK][0][0], cube[BACK][1][0])
-    return cube
-
-def backAntiClockwise(cube):
-    backClockwise(cube)
-    backClockwise(cube)
-    backClockwise(cube)
-    return cube
-
-def readCube(inputText):
-    inputCube = defaultCube()
-    charPosition = 0
-    for side in (TOP, FRONT, BOTTOM, BACK, LEFT, RIGHT):
-        for row in [0, 1]:
-            for pos in [0, 1]:
-                inputCube[side][row][pos] = eval(inputText[charPosition].upper())
-                charPosition += 1
-    return inputCube
 
 def solve(inputCube):
-    solved, solvePath = checkSolved(inputCube) 
+    """
+    Solves the given Rubik's Cube using a breadth-first search.
+
+    This function first checks if the cube is already solved or can be solved
+    using the pre-calculated solutions. If not, it performs a breadth-first
+    search to find the shortest solution path.
+
+    Args:
+        inputCube (RubikCube): The cube to solve.
+    """
+    solved, solvePath = checkSolved(inputCube)
     if solved:
         if solvePath == "":
-            print "\nThe Cube is already solved. Nothing to do.\n" 
+            print("\nThe Cube is already solved. Nothing to do.\n")
         else:
-            print "\nFound Solution: %s\n" % solvePath
+            print("\nFound Solution: %s\n" % solvePath)
     else:
-        cubeKeys = set([get_key(inputCube)])
+        cubeKeys = set([inputCube.get_key()])
         newcubes = [(inputCube, "")]
         solution_found = False
         try:
             while not solution_found:
                 cubes, newcubes = newcubes, []
-                # todo calculate in threads e.g. one thread for each cube, or 4 worker threads!
-                # example: put the cubes in a queue and run 4 worker threads which empty the queue
-                # introduce a global variable: solution_found to stop the worker threads.
                 for currCube, path in cubes:
                     for nextCube, operation in getAllMoves(currCube, path):
-                        key = get_key(nextCube)
+                        key = nextCube.get_key()
                         if key not in cubeKeys:
                             solved, solvePath = checkSolved(nextCube)
                             if solved:
-                                print "\nFound Solution: %s%s\n" % (operation, solvePath)
-                                # todo: stop all thread if solution was found.
+                                print("\nFound Solution: %s%s\n" % (path + operation, solvePath))
                                 solution_found = True
                                 return
-                            
+
                             cubeKeys.add(key)
-                            newcubes.append((nextCube, operation))
+                            newcubes.append((nextCube, path + operation))
         except KeyboardInterrupt:
             pass
-    
+
+
 def random_moves(cube, count):
-    cubeKeys = set([get_key(cube)])
+    """
+    Applies a number of random moves to the cube.
+
+    Args:
+        cube (RubikCube): The cube to randomize.
+        count (int): The number of random moves to apply.
+
+    Returns:
+        RubikCube: The randomized cube.
+    """
+    cubeKeys = set([cube.get_key()])
     randomMoves = 0
-    moves = [leftDown, leftUp, rightDown, rightUp,
-             topLeft, topRight, bottomLeft, bottomRight,
-             frontClockwise, frontAntiClockwise, backClockwise, backAntiClockwise]
+    moves = ["move_left_down", "move_left_up", "move_right_down", "move_right_up",
+             "move_top_left", "move_top_right", "move_bottom_left", "move_bottom_right",
+             "move_front_clockwise", "move_front_anti_clockwise", "move_back_clockwise", "move_back_anti_clockwise"]
     while randomMoves < count:
-        move = random.choice(moves)
-        move(cube)
-        key = get_key(cube)
+        move_name = random.choice(moves)
+        getattr(cube, move_name)()
+        key = cube.get_key()
         if key not in cubeKeys:
             cubeKeys.add(key)
             randomMoves += 1
 
     return cube
 
-def get_key(cube):
-    return "".join([pos for side in cube for row in side for pos in row])
-
 def preCalcCubes():
-    # DefaultCubes: 24 Cubes
-    # Level 1: 168 Cubes
-    # Level 2: 816 Cubes
-    # level 3: 3696 Cubes
-    # Level 4: 16512 Cubes    
+    """
+    Pre-calculates solutions for cubes up to a certain depth.
+
+    This function populates the `preSolutionCubes` dictionary with solutions
+    for all cubes that can be solved within `LEVEL_OF_PRECALCULATION` moves.
+    """
     calculateDefaultCubesOriented(preSolutionCubes)
     for _ in range(LEVEL_OF_PRECALCULATION):
-        for key, (cube, path) in preSolutionCubes.items()[:]:
+        for key, (cube, path) in list(preSolutionCubes.items())[:]:
             for nextCube, nextPath in getAllMoves(cube, path):
-                key = get_key(nextCube)
+                key = nextCube.get_key()
                 if key not in preSolutionCubes:
                     preSolutionCubes[key] = (nextCube, nextPath)
 
 def main():
+    """
+    The main function of the Rubik's Cube solver.
+
+    This function handles command-line arguments, starts the pre-calculation
+    thread, and enters the interactive command loop.
+    """
     t = threading.Thread(target=preCalcCubes)
     t.start()
-    
-    print "-- Rubik 2x2 Solver --"
+
+    print("-- Rubik 2x2 Solver --")
 
     if sys.argv[1:]:
-        cube = readCube(sys.argv[1])
+        cube = RubikCube(sys.argv[1])
+        cube.print_cube()
+        print("Solving...")
+        t.join()
+        solve(cube)
     else:
-        cube = readCube("yyyyrrrrwwwwppppbbbbgggg")
-    printcube(cube)
-    while True:
-        cmdText = raw_input("Please enter command: ")
-        if cmdText == "solve":
-            t.join()
-            solve(cube)
-        elif cmdText == "print":
-            printcube(cube)
-        elif cmdText == "random":
-            random_moves(cube, 8)
-            printcube(cube)
-        elif cmdText == "random4":
-            random_moves(cube, 4)
-            printcube(cube)
-        elif cmdText == "reset":
-            cube = defaultCube()
-            printcube(cube)
-        elif cmdText[:5] == "init ":
-            cube = readCube(cmdText[5:])
-            printcube(cube)
-        elif cmdText == "exit":
-            exit(0)
-        elif cmdText != "" and set(cmdText).issubset(set("lLtTfFrRbBaA")):
-            for cmdChar in cmdText:
-                if cmdChar == "l":
-                    leftDown(cube)
-                elif cmdChar == "t":
-                    topLeft(cube)
-                elif cmdChar == "f":
-                    frontClockwise(cube)
-                elif cmdChar == "L":
-                    leftUp(cube)
-                elif cmdChar == "T":
-                    topRight(cube)
-                elif cmdChar == "F":
-                    frontAntiClockwise(cube)
-                elif cmdChar == "R":
-                    rightDown(cube)
-                elif cmdChar == "R":
-                    rightUp(cube)
-                elif cmdChar == "B":
-                    bottomLeft(cube)
-                elif cmdChar == "B":
-                    bottomRight(cube)
-                elif cmdChar == "a":
-                    backClockwise(cube)
-                elif cmdChar == "A":
-                    backAntiClockwise(cube)
-                    
-            printcube(cube)
-        else:
-            print "Command not known. Possible commands are: solve, print, l, L, t, T, f, F, R, R, B, B, a, A, exit"
+        cube = RubikCube("yyyyrrrrwwwwppppbbbbgggg")
+        cube.print_cube()
+        while True:
+            cmdText = input("Please enter command: ")
+            if cmdText == "solve":
+                t.join()
+                solve(cube)
+            elif cmdText == "print":
+                cube.print_cube()
+            elif cmdText == "random":
+                random_moves(cube, 8)
+                cube.print_cube()
+            elif cmdText == "random4":
+                random_moves(cube, 4)
+                cube.print_cube()
+            elif cmdText == "reset":
+                cube = RubikCube()
+                cube.print_cube()
+            elif cmdText.startswith("init "):
+                cube = RubikCube(cmdText[5:])
+                cube.print_cube()
+            elif cmdText == "exit":
+                exit(0)
+            elif cmdText != "" and set(cmdText).issubset(set("lLtTfFrRbBaA")):
+                for cmdChar in cmdText:
+                    if cmdChar == "l":
+                        cube.move_left_down()
+                    elif cmdChar == "t":
+                        cube.move_top_left()
+                    elif cmdChar == "f":
+                        cube.move_front_clockwise()
+                    elif cmdChar == "L":
+                        cube.move_left_up()
+                    elif cmdChar == "T":
+                        cube.move_top_right()
+                    elif cmdChar == "F":
+                        cube.move_front_anti_clockwise()
+                    elif cmdChar == "R":
+                        cube.move_right_down()
+                    elif cmdChar == "r":
+                        cube.move_right_up()
+                    elif cmdChar == "B":
+                        cube.move_bottom_left()
+                    elif cmdChar == "b":
+                        cube.move_bottom_right()
+                    elif cmdChar == "a":
+                        cube.move_back_clockwise()
+                    elif cmdChar == "A":
+                        cube.move_back_anti_clockwise()
+
+                cube.print_cube()
+            else:
+                print("Command not known. Possible commands are: solve, print, l, L, t, T, f, F, R, r, B, b, a, A, exit")
 
 if __name__ == "__main__":
     main()

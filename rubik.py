@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 """
 This script provides a solver for the 2x2 Rubik's Cube (Pocket Cube).

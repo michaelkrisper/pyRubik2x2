@@ -10,18 +10,27 @@ command-line argument.
 The solver uses a breadth-first search algorithm and a pre-calculation step
 to find solutions for cubes that are a few moves away from the solved state.
 """
-import sys
 import random
+import sys
 import threading
+
 from cube import RubikCube
 
 try:
-    import readline
+    import readline  # noqa: F401 - enables line editing in input()
 except ImportError:
     pass
 
 # CONSTANTS ###################################################################
 LEVEL_OF_PRECALCULATION = 4
+MOVES = {
+    "l": "move_left_down", "L": "move_left_up",
+    "t": "move_top_left", "T": "move_top_right",
+    "f": "move_front_clockwise", "F": "move_front_anti_clockwise",
+    "R": "move_right_down", "r": "move_right_up",
+    "B": "move_bottom_left", "b": "move_bottom_right",
+    "a": "move_back_clockwise", "A": "move_back_anti_clockwise",
+}
 # CONSTANTS ###################################################################
 
 
@@ -41,17 +50,17 @@ def calculateDefaultCubesOriented(cubes):
         cubes (dict): A dictionary to store the pre-calculated cube states.
     """
     c = RubikCube()
-    c_copy = RubikCube(c.get_key())
+    c_copy = c.copy()
     c_copy.move_top_left()
     c_copy.move_bottom_left()
     ctb = c_copy
 
-    c_copy = RubikCube(ctb.get_key())
+    c_copy = ctb.copy()
     c_copy.move_top_left()
     c_copy.move_bottom_left()
     ctbtb = c_copy
 
-    c_copy = RubikCube(ctbtbtb.get_key())
+    c_copy = ctbtb.copy()
     c_copy.move_top_left()
     c_copy.move_bottom_left()
     ctbtbtb = c_copy
@@ -62,10 +71,11 @@ def calculateDefaultCubesOriented(cubes):
     cubes[ctbtbtb.get_key()] = (ctbtbtb, "")
 
     for cube_obj in [c, ctb, ctbtb, ctbtbtb]:
-        for method1, method2 in [("move_right_down", "move_left_down"), ("move_front_clockwise", "move_back_clockwise")]:
+        for method1, method2 in [("move_right_down", "move_left_down"),
+                                 ("move_front_clockwise", "move_back_clockwise")]:
             nextCube = cube_obj
             for _ in range(3):
-                c_copy = RubikCube(nextCube.get_key())
+                c_copy = nextCube.copy()
                 getattr(c_copy, method1)()
                 getattr(c_copy, method2)()
                 nextCube = c_copy
@@ -105,69 +115,81 @@ def getAllMoves(currCube, path):
         tuple: A tuple containing the new cube state and the updated path.
     """
     if (len(path) == 0 or path[-1] != "L") and (len(path) < 3 or path[-3:] != "lll"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_left_down()
         yield (new_cube, path + "l")
     if (len(path) == 0 or path[-1] != "T") and (len(path) < 3 or path[-3:] != "ttt"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_top_left()
         yield (new_cube, path + "t")
     if (len(path) == 0 or path[-1] != "F") and (len(path) < 3 or path[-3:] != "fff"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_front_clockwise()
         yield (new_cube, path + "f")
     if (len(path) == 0 or path[-1] != "l") and (len(path) < 3 or path[-3:] != "LLL"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_left_up()
         yield (new_cube, path + "L")
     if (len(path) == 0 or path[-1] != "t") and (len(path) < 3 or path[-3:] != "TTT"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_top_right()
         yield (new_cube, path + "T")
     if (len(path) == 0 or path[-1] != "f") and (len(path) < 3 or path[-3:] != "FFF"):
-        new_cube = RubikCube(currCube.get_key())
+        new_cube = currCube.copy()
         new_cube.move_front_anti_clockwise()
         yield (new_cube, path + "F")
 
 
+def findSolution(inputCube):
+    """
+    Finds a solution for the given Rubik's Cube using a breadth-first search.
+
+    The search expands states from the input cube until it reaches a state
+    from the pre-calculated table, then appends the stored path in reverse.
+
+    Args:
+        inputCube (RubikCube): The cube to solve.
+
+    Returns:
+        str: The move sequence ("" if already solved), or None if the state
+             is unsolvable or the search was interrupted.
+    """
+    solved, solvePath = checkSolved(inputCube)
+    if solved:
+        return solvePath
+    cubeKeys = {inputCube.get_key()}
+    newcubes = [(inputCube, "")]
+    try:
+        while newcubes:
+            cubes, newcubes = newcubes, []
+            for currCube, path in cubes:
+                for nextCube, nextPath in getAllMoves(currCube, path):
+                    key = nextCube.get_key()
+                    if key not in cubeKeys:
+                        solved, solvePath = checkSolved(nextCube)
+                        if solved:
+                            return nextPath + solvePath
+                        cubeKeys.add(key)
+                        newcubes.append((nextCube, nextPath))
+    except KeyboardInterrupt:
+        pass
+    return None
+
+
 def solve(inputCube):
     """
-    Solves the given Rubik's Cube using a breadth-first search.
-
-    This function first checks if the cube is already solved or can be solved
-    using the pre-calculated solutions. If not, it performs a breadth-first
-    search to find the shortest solution path.
+    Solves the given Rubik's Cube and prints the solution.
 
     Args:
         inputCube (RubikCube): The cube to solve.
     """
-    solved, solvePath = checkSolved(inputCube)
-    if solved:
-        if solvePath == "":
-            print("\nThe Cube is already solved. Nothing to do.\n")
-        else:
-            print("\nFound Solution: %s\n" % solvePath)
+    solution = findSolution(inputCube)
+    if solution is None:
+        print("\nNo solution found.\n")
+    elif solution == "":
+        print("\nThe Cube is already solved. Nothing to do.\n")
     else:
-        cubeKeys = set([inputCube.get_key()])
-        newcubes = [(inputCube, "")]
-        solution_found = False
-        try:
-            while not solution_found:
-                cubes, newcubes = newcubes, []
-                for currCube, path in cubes:
-                    for nextCube, operation in getAllMoves(currCube, path):
-                        key = nextCube.get_key()
-                        if key not in cubeKeys:
-                            solved, solvePath = checkSolved(nextCube)
-                            if solved:
-                                print("\nFound Solution: %s%s\n" % (path + operation, solvePath))
-                                solution_found = True
-                                return
-
-                            cubeKeys.add(key)
-                            newcubes.append((nextCube, path + operation))
-        except KeyboardInterrupt:
-            pass
+        print("\nFound Solution: %s\n" % solution)
 
 
 def random_moves(cube, count):
@@ -195,6 +217,22 @@ def random_moves(cube, count):
             randomMoves += 1
 
     return cube
+
+def applyMoves(cube, moves):
+    """
+    Applies a sequence of move letters (see MOVES) to the cube in place.
+
+    Args:
+        cube (RubikCube): The cube to manipulate.
+        moves (str): The move sequence, e.g. "lFtL".
+
+    Returns:
+        RubikCube: The same cube, for chaining.
+    """
+    for move in moves:
+        getattr(cube, MOVES[move])()
+    return cube
+
 
 def preCalcCubes():
     """
@@ -224,7 +262,10 @@ def main():
     print("-- Rubik 2x2 Solver --")
 
     if sys.argv[1:]:
-        cube = RubikCube(sys.argv[1])
+        try:
+            cube = RubikCube(sys.argv[1])
+        except ValueError as error:
+            sys.exit(str(error))
         cube.print_cube()
         print("Solving...")
         t.join()
@@ -233,7 +274,10 @@ def main():
         cube = RubikCube("yyyyrrrrwwwwppppbbbbgggg")
         cube.print_cube()
         while True:
-            cmdText = input("Please enter command: ")
+            try:
+                cmdText = input("Please enter command: ")
+            except EOFError:
+                sys.exit(0)
             if cmdText == "solve":
                 t.join()
                 solve(cube)
@@ -249,40 +293,20 @@ def main():
                 cube = RubikCube()
                 cube.print_cube()
             elif cmdText.startswith("init "):
-                cube = RubikCube(cmdText[5:])
+                try:
+                    cube = RubikCube(cmdText[5:])
+                except ValueError as error:
+                    print(error)
+                    continue
                 cube.print_cube()
             elif cmdText == "exit":
-                exit(0)
-            elif cmdText != "" and set(cmdText).issubset(set("lLtTfFrRbBaA")):
-                for cmdChar in cmdText:
-                    if cmdChar == "l":
-                        cube.move_left_down()
-                    elif cmdChar == "t":
-                        cube.move_top_left()
-                    elif cmdChar == "f":
-                        cube.move_front_clockwise()
-                    elif cmdChar == "L":
-                        cube.move_left_up()
-                    elif cmdChar == "T":
-                        cube.move_top_right()
-                    elif cmdChar == "F":
-                        cube.move_front_anti_clockwise()
-                    elif cmdChar == "R":
-                        cube.move_right_down()
-                    elif cmdChar == "r":
-                        cube.move_right_up()
-                    elif cmdChar == "B":
-                        cube.move_bottom_left()
-                    elif cmdChar == "b":
-                        cube.move_bottom_right()
-                    elif cmdChar == "a":
-                        cube.move_back_clockwise()
-                    elif cmdChar == "A":
-                        cube.move_back_anti_clockwise()
-
+                sys.exit(0)
+            elif cmdText != "" and set(cmdText).issubset(set(MOVES)):
+                applyMoves(cube, cmdText)
                 cube.print_cube()
             else:
-                print("Command not known. Possible commands are: solve, print, l, L, t, T, f, F, R, r, B, b, a, A, exit")
+                print("Command not known. Possible commands are: solve, print, random, random4, reset, init <state>, "
+                      "l, L, t, T, f, F, R, r, B, b, a, A, exit")
 
 if __name__ == "__main__":
     main()

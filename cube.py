@@ -1,3 +1,9 @@
+# ANSI-colored stickers: yellow, red, white, purple, blue, green.
+Y, R, W, P, B, G = ("\x1b[1;33;43m Y \x1b[0m", "\x1b[1;31;41m R \x1b[0m", "\x1b[1;37;47m W \x1b[0m",
+                    "\x1b[1;35;45m P \x1b[0m", "\x1b[1;34;44m B \x1b[0m", "\x1b[1;32;42m G \x1b[0m")
+COLORS = {"Y": Y, "R": R, "W": W, "P": P, "B": B, "G": G}
+
+
 class RubikCube:
     """
     Represents a 2x2 Rubik's Cube.
@@ -28,8 +34,6 @@ class RubikCube:
         Returns:
             list: A 3D list representing the solved cube.
         """
-        Y, R, W, P, B, G = ("\x1b[1;33;43m Y \x1b[0m", "\x1b[1;31;41m R \x1b[0m", "\x1b[1;37;47m W \x1b[0m",
-                                "\x1b[1;35;45m P \x1b[0m", "\x1b[1;34;44m B \x1b[0m", "\x1b[1;32;42m G \x1b[0m")
         return [
             [[Y, Y], [Y, Y]],
             [[R, R], [R, R]],
@@ -46,7 +50,18 @@ class RubikCube:
         Returns:
             list: A new 3D list that is a copy of the current cube.
         """
-        return [row[:] for row in self.cube]
+        return [[row[:] for row in side] for side in self.cube]
+
+    def copy(self):
+        """
+        Creates an independent copy of this cube.
+
+        Returns:
+            RubikCube: A new cube with the same state.
+        """
+        new_cube = RubikCube()
+        new_cube.cube = self.copy_cube()
+        return new_cube
 
     def _read_cube(self, input_text):
         """
@@ -58,27 +73,18 @@ class RubikCube:
 
         Returns:
             list: A 3D list representing the parsed cube state.
+
+        Raises:
+            ValueError: If the text is not 24 valid color letters.
         """
-        Y, R, W, P, B, G = ("\x1b[1;33;43m Y \x1b[0m", "\x1b[1;31;41m R \x1b[0m", "\x1b[1;37;47m W \x1b[0m",
-                                "\x1b[1;35;45m P \x1b[0m", "\x1b[1;34;44m B \x1b[0m", "\x1b[1;32;42m G \x1b[0m")
+        if len(input_text) != 24 or not set(input_text.upper()) <= set(COLORS):
+            raise ValueError("A cube state needs exactly 24 color letters out of Y, R, W, P, B, G.")
         input_cube = self.default_cube()
         char_position = 0
         for side in range(6):
             for row in [0, 1]:
                 for pos in [0, 1]:
-                    color_char = input_text[char_position].upper()
-                    if color_char == 'Y':
-                        input_cube[side][row][pos] = Y
-                    elif color_char == 'R':
-                        input_cube[side][row][pos] = R
-                    elif color_char == 'W':
-                        input_cube[side][row][pos] = W
-                    elif color_char == 'P':
-                        input_cube[side][row][pos] = P
-                    elif color_char == 'B':
-                        input_cube[side][row][pos] = B
-                    elif color_char == 'G':
-                        input_cube[side][row][pos] = G
+                    input_cube[side][row][pos] = COLORS[input_text[char_position].upper()]
                     char_position += 1
         return input_cube
 

@@ -1,6 +1,7 @@
 # pyRubik2x2
 
 [![CI](https://github.com/michaelkrisper/pyRubik2x2/actions/workflows/ci.yml/badge.svg)](https://github.com/michaelkrisper/pyRubik2x2/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/tag/michaelkrisper/pyRubik2x2?sort=semver&label=version)](https://github.com/michaelkrisper/pyRubik2x2/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
@@ -85,6 +86,8 @@ ruff check  # lint
 ```
 
 CI runs both on every push and pull request against Python 3.9 to 3.14.
+Every merge to `main` is tagged with the next patch version; bundled releases
+with release notes come from the Release workflow.
 
 ## Project structure
 
@@ -94,6 +97,11 @@ CI runs both on every push and pull request against Python 3.9 to 3.14.
 | `cube.py` | `RubikCube` class - state representation, rotations, rendering |
 | `test_rubik.py` | Unit tests for moves, parsing and the solver |
 | `run.bat` | Convenience launcher for Windows |
+
+## Contributing
+
+Changes start with an issue and go through a pull request; see
+[CONTRIBUTING](CONTRIBUTING.md).
 
 ## License
 
